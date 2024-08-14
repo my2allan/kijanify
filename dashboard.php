@@ -174,6 +174,13 @@ $totalPagesCashRequests = $paginatedCashRequests['totalPages'];
         .badge-danger {
             background-color: #dc3545;
         }
+        /* Ensure the row is clickable but doesn't prevent button actions */
+        .clickable-row {
+            cursor: pointer;
+        }
+        .clickable-row td:not(.no-click) {
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -206,7 +213,7 @@ $totalPagesCashRequests = $paginatedCashRequests['totalPages'];
                 </thead>
                 <tbody>
                     <?php foreach ($requests as $request): ?>
-                        <tr>
+                        <tr class="clickable-row" data-href="request_details.php?id=<?php echo $request['id']; ?>">
                             <td><?php echo htmlspecialchars($request['item']); ?></td>
                             <td>
                                 <span class="badge badge-<?php echo $request['status'] == 'approved' ? 'success' : ($request['status'] == 'rejected' ? 'danger' : 'secondary'); ?>">
@@ -216,7 +223,7 @@ $totalPagesCashRequests = $paginatedCashRequests['totalPages'];
                             <td><?php echo htmlspecialchars($request['quantity_change']); ?></td>
                             <td>
                                 <?php if ($request['attachment']): ?>
-                                    <a href="<?php echo htmlspecialchars($request['attachment']); ?>" target="_blank">
+                                    <a href="<?php echo htmlspecialchars($request['attachment']); ?>" target="_blank" class="no-click">
                                         <i class="fas fa-paperclip"></i>
                                     </a>
                                 <?php endif; ?>
@@ -251,7 +258,7 @@ $totalPagesCashRequests = $paginatedCashRequests['totalPages'];
                 </thead>
                 <tbody>
                     <?php foreach ($cash_requests as $cash_request): ?>
-                        <tr onclick="window.location.href='cash_request_journey.php?id=<?php echo $cash_request['id']; ?>';" style="cursor:pointer;">
+                        <tr class="clickable-row" data-href="cash_request_journey.php?id=<?php echo $cash_request['id']; ?>">
                             <td><?php echo htmlspecialchars($cash_request['budget_item']); ?></td>
                             <td>UGX <?php echo number_format($cash_request['amount'], 2); ?></td>
                             <td>UGX <?php echo number_format($cash_request['budget_cost'], 2); ?></td>
@@ -292,7 +299,7 @@ $totalPagesCashRequests = $paginatedCashRequests['totalPages'];
                 </thead>
                 <tbody>
                     <?php foreach ($requests as $request): ?>
-                        <tr>
+                        <tr class="clickable-row" data-href="request_details.php?id=<?php echo $request['id']; ?>">
                             <td><?php echo htmlspecialchars($request['item']); ?></td>
                             <td>
                                 <span class="badge badge-<?php echo $request['status'] == 'approved' ? 'success' : ($request['status'] == 'rejected' ? 'danger' : 'secondary'); ?>">
@@ -302,14 +309,14 @@ $totalPagesCashRequests = $paginatedCashRequests['totalPages'];
                             <td><?php echo htmlspecialchars($request['quantity_change']); ?></td>
                             <td>
                                 <?php if ($request['attachment']): ?>
-                                    <a href="<?php echo htmlspecialchars($request['attachment']); ?>" target="_blank">
+                                    <a href="<?php echo htmlspecialchars($request['attachment']); ?>" target="_blank" class="no-click">
                                         <i class="fas fa-paperclip"></i>
                                     </a>
                                 <?php endif; ?>
                             </td>
                             <td><?php echo htmlspecialchars($request['username']); ?></td>
                             <td><?php echo htmlspecialchars($request['created_at']); ?></td>
-                            <td>
+                            <td class="no-click">
                                 <a href="approve_cash_request.php?id=<?php echo $request['id']; ?>" class="btn btn-success <?php echo ($request['status'] != 'pending') ? 'disabled' : ''; ?>">Approve</a>
                                 <a href="reject_cash_request.php?id=<?php echo $request['id']; ?>" class="btn btn-danger <?php echo ($request['status'] != 'pending') ? 'disabled' : ''; ?>">Reject</a>
                             </td>
@@ -342,7 +349,7 @@ $totalPagesCashRequests = $paginatedCashRequests['totalPages'];
                 </thead>
                 <tbody>
                     <?php foreach ($budgets as $budget): ?>
-                        <tr>
+                        <tr class="clickable-row" data-href="budget_details.php?id=<?php echo $budget['id']; ?>">
                             <td><?php echo htmlspecialchars($budget['item']); ?></td>
                             <td><?php echo htmlspecialchars($budget['cost']); ?></td>
                             <td><?php echo htmlspecialchars($budget['start_month']); ?></td>
@@ -371,7 +378,7 @@ $totalPagesCashRequests = $paginatedCashRequests['totalPages'];
             <h2>Department Cash Requests</h2>
             <table class="table table-bordered table-hover">
                 <thead class="thead-light">
-                    <tr onclick="window.location.href='cash_request_journey.php?id=<?php echo $cash_request['id']; ?>';" style="cursor:pointer;">
+                    <tr>
                         <th>Reason for Funds</th>
                         <th>Requested Amount</th>
                         <th>Budgeted Amount</th>
@@ -382,15 +389,21 @@ $totalPagesCashRequests = $paginatedCashRequests['totalPages'];
                 </thead>
                 <tbody>
                     <?php foreach ($cash_requests as $cash_request): ?>
-                        <tr>
+                        <tr class="clickable-row" data-href="cash_request_journey.php?id=<?php echo $cash_request['id']; ?>">
                             <td><?php echo htmlspecialchars($cash_request['budget_item']); ?></td>
                             <td>UGX <?php echo number_format($cash_request['amount'], 2); ?></td>
                             <td>UGX <?php echo number_format($cash_request['budget_cost'], 2); ?></td>
                             <td><?php echo htmlspecialchars($cash_request['username']); ?></td>
                             <td><?php echo htmlspecialchars($cash_request['created_at']); ?></td>
-                            <td>
-                                <a href="approve_cash_request.php?id=<?php echo $cash_request['id']; ?>" class="btn btn-success <?php echo ($cash_request['status'] != 'pending') ? 'disabled' : ''; ?>">Approve</a>
-                                <a href="reject_cash_request.php?id=<?php echo $cash_request['id']; ?>" class="btn btn-danger <?php echo ($cash_request['status'] != 'pending') ? 'disabled' : ''; ?>">Reject</a>
+                            <td class="no-click">
+                                <?php if ($cash_request['status'] == 'pending'): ?>
+                                    <a href="approve_cash_request.php?id=<?php echo $cash_request['id']; ?>" class="btn btn-success">Approve</a>
+                                    <a href="reject_cash_request.php?id=<?php echo $cash_request['id']; ?>" class="btn btn-danger">Reject</a>
+                                <?php else: ?>
+                                    <span class="badge badge-<?php echo $cash_request['status'] == 'approved_by_hod' ? 'success' :'danger'; ?>">
+                                        <?php echo ucfirst(str_replace('_', ' ', $cash_request['status'])); ?>
+                                    </span>
+                                <?php endif; ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -424,7 +437,7 @@ $totalPagesCashRequests = $paginatedCashRequests['totalPages'];
                 </thead>
                 <tbody>
                     <?php foreach ($budgets as $budget): ?>
-                        <tr>
+                        <tr class="clickable-row" data-href="budget_details.php?id=<?php echo $budget['id']; ?>">
                             <td><?php echo htmlspecialchars($budget['item']); ?></td>
                             <td><?php echo htmlspecialchars($budget['cost']); ?></td>
                             <td><?php echo htmlspecialchars($budget['start_month']); ?></td>
@@ -472,19 +485,19 @@ $totalPagesCashRequests = $paginatedCashRequests['totalPages'];
                 </thead>
                 <tbody>
                     <?php foreach ($cash_requests as $cash_request): ?>
-                        <tr onclick="window.location.href='cash_request_journey.php?id=<?php echo $cash_request['id']; ?>';" style="cursor:pointer;">
+                        <tr class="clickable-row" data-href="cash_request_journey.php?id=<?php echo $cash_request['id']; ?>">
                             <td><?php echo htmlspecialchars($cash_request['budget_item']); ?></td>
                             <td>UGX <?php echo number_format($cash_request['amount'], 2); ?></td>
                             <td>UGX <?php echo number_format($cash_request['budget_cost'], 2); ?></td>
                             <td><?php echo htmlspecialchars($cash_request['department_name']); ?></td>
                             <td><?php echo htmlspecialchars($cash_request['submitted_by_name']); ?></td>
                             <td><?php echo htmlspecialchars($cash_request['created_at']); ?></td>
-                            <td>
-                                <?php if ($cash_request['status'] == 'pending'): ?>
+                            <td class="no-click">
+                                <?php if ($cash_request['status'] == 'approved_by_hod'): ?>
                                     <a href="approve_cash_request_finance.php?id=<?php echo $cash_request['id']; ?>" class="btn btn-success">Disburse</a>
                                     <a href="reject_cash_request_finance.php?id=<?php echo $cash_request['id']; ?>" class="btn btn-danger">Reject</a>
                                 <?php else: ?>
-                                    <span class="badge badge-<?php echo $cash_request['status'] == 'approved' ? 'success' :'danger'; ?>">
+                                    <span class="badge badge-<?php echo $cash_request['status'] == 'disbursed' ? 'success' :'danger'; ?>">
                                         <?php echo ucfirst($cash_request['status']); ?>
                                     </span>
                                 <?php endif; ?>
@@ -510,5 +523,13 @@ $totalPagesCashRequests = $paginatedCashRequests['totalPages'];
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        // Make rows clickable
+        document.querySelectorAll('.clickable-row').forEach(function(row) {
+            row.addEventListener('click', function() {
+                window.location = row.getAttribute('data-href');
+            });
+        });
+    </script>
 </body>
 </html>
