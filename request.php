@@ -31,18 +31,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 
     if ($request_type == 'cash') {
-        // Fetch available funds from the budgets table
-        $stmt = $pdo->prepare("SELECT SUM(cost) AS available_funds FROM budgets WHERE department_id = ? AND status = 'approved'");
-        $stmt->execute([$department_id]);
-        $available_funds = $stmt->fetchColumn();
+        // Fetch the approved budget details
+        $stmt = $pdo->prepare("SELECT id, cost FROM budgets WHERE item = ? AND department_id = ? AND status = 'approved'");
+        $stmt->execute([$item, $department_id]);
+        $budget = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if ($available_funds < $quantity) {
-            die("Requested amount exceeds available funds.");
+        if (!$budget) {
+            die("Invalid budget selected or the budget is not approved.");
         }
 
-        // Insert cash request into requests table
-        $stmt = $pdo->prepare("INSERT INTO requests (user_id, department_id, item, quantity, attachment) VALUES (?, ?, ?, ?, ?)");
-        $stmt->execute([$user_id, $department_id, $item, $quantity, $attachment]);
+        $remaining_budget = $budget['cost'];
+
+        // Calculate remaining budget after existing requests
+        $stmt = $pdo->prepare("SELECT SUM(amount) AS total_requested FROM cash_requests WHERE budget_id = ? AND department_id = ? AND status IN ('pending', 'approved', 'disbursed')");
+        $stmt->execute([$budget['id'], $department_id]);
+        $total_requested = $stmt->fetchColumn();
+        $remaining_budget -= $total_requested;
+
+        if ($quantity > $remaining_budget) {
+            die("Requested amount exceeds the remaining budget of UGX " . number_format($remaining_budget, 2));
+        }
+
+        // Insert cash request into cash_requests table
+        $stmt = $pdo->prepare("
+            INSERT INTO cash_requests (user_id, department_id, budget_id, amount, status, created_at)
+            VALUES (?, ?, ?, ?, 'pending', NOW())
+        ");
+        $stmt->execute([$user_id, $department_id, $budget['id'], $quantity]);
+
     } else {
         // Handle inventory or new purchase requests
         $stmt = $pdo->prepare("INSERT INTO requests (user_id, department_id, item, attachment) VALUES (?, ?, ?, ?)");
@@ -133,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     let itemDropdown = document.getElementById('item');
                     itemDropdown.innerHTML = '<option value="">Select Reason for Funds</option>';
                     budgets.forEach(function(budget) {
-                        itemDropdown.innerHTML += `<option value="${budget.item}" data-cost="${budget.cost}">${budget.item}</option>`;
+                        itemDropdown.innerHTML += `<option value="${budget.item}" data-cost="${budget.cost}" data-budget-id="${budget.id}">${budget.item}</option>`;
                     });
                 }
             }

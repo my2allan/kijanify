@@ -1,4 +1,5 @@
 <?php
+
 require 'config.php';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
@@ -14,6 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
             $error = "Your account is disabled. Please contact the administrator.";
         } else {
             $_SESSION['user_id'] = $user['id'];
+            $_SESSION['username'] = $user['username']; // Add this line to store the username in the session
             $_SESSION['role'] = $user['role'];
             header("Location: dashboard.php");
             exit();

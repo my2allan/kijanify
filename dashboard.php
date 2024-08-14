@@ -17,24 +17,37 @@ $totalPagesBudgets = 1;
 $totalPagesCashRequests = 1;
 
 if ($role == 'user') {
-    // Fetch user requests
+    // Fetch user inventory requests
     $stmt = $pdo->prepare("
         SELECT r.*, u.username, ic.quantity_change 
         FROM requests r 
         JOIN users u ON r.user_id = u.id 
         LEFT JOIN inventory_changes ic ON r.id = ic.request_id 
-        WHERE r.user_id = ?
+        WHERE r.user_id = ? AND r.status != 'cash'
+        ORDER BY r.id DESC
     ");
     $stmt->execute([$user_id]);
     $requests = $stmt->fetchAll();
+
+    // Fetch user cash requests
+    $stmt = $pdo->prepare("
+        SELECT cr.*, b.item AS budget_item, b.cost AS budget_cost 
+        FROM cash_requests cr 
+        JOIN budgets b ON cr.budget_id = b.id 
+        WHERE cr.user_id = ?
+        ORDER BY cr.id DESC
+    ");
+    $stmt->execute([$user_id]);
+    $cash_requests = $stmt->fetchAll();
 } elseif ($role == 'headofdepartment') {
-    // Fetch department requests
+    // Fetch department inventory requests
     $stmt = $pdo->prepare("
         SELECT r.*, u.username, ic.quantity_change 
         FROM requests r 
         JOIN users u ON r.user_id = u.id 
         LEFT JOIN inventory_changes ic ON r.id = ic.request_id 
         WHERE r.department_id = (SELECT id FROM departments WHERE head_of_department_id = ?)
+        ORDER BY r.id DESC
     ");
     $stmt->execute([$user_id]);
     $requests = $stmt->fetchAll();
@@ -43,42 +56,66 @@ if ($role == 'user') {
     $stmt = $pdo->prepare("
         SELECT * FROM budgets 
         WHERE department_id = (SELECT id FROM departments WHERE head_of_department_id = ?)
+        ORDER BY id DESC
     ");
     $stmt->execute([$user_id]);
     $budgets = $stmt->fetchAll();
+
+    // Fetch department cash requests
+    $stmt = $pdo->prepare("
+        SELECT cr.*, u.username, b.item AS budget_item, b.cost AS budget_cost 
+        FROM cash_requests cr 
+        JOIN users u ON cr.user_id = u.id 
+        JOIN budgets b ON cr.budget_id = b.id 
+        WHERE cr.department_id = (SELECT id FROM departments WHERE head_of_department_id = ?)
+        ORDER BY cr.id DESC
+    ");
+    $stmt->execute([$user_id]);
+    $cash_requests = $stmt->fetchAll();
 } elseif ($role == 'finance') {
     // Fetch all budgets for finance role, showing all statuses
     $stmt = $pdo->query("
-        SELECT b.*, u1.username AS submitted_by_name
-        FROM budgets b
-        LEFT JOIN users u1 ON b.submitted_by = u1.id
-        ORDER BY b.submitted_at DESC
+        SELECT b.*, u.username AS submitted_by_name 
+        FROM budgets b 
+        LEFT JOIN users u ON b.submitted_by = u.id 
+        ORDER BY b.id DESC
     ");
     $budgets = $stmt->fetchAll();
 
     // Fetch all cash requests for finance role, showing all statuses
     $stmt = $pdo->query("
-        SELECT cr.*, d.name AS department_name, u.username AS submitted_by_name 
+        SELECT cr.*, b.item AS budget_item, b.cost AS budget_cost, u.username AS submitted_by_name, d.name AS department_name 
         FROM cash_requests cr 
+        JOIN budgets b ON cr.budget_id = b.id 
+        JOIN users u ON cr.user_id = u.id 
         JOIN departments d ON cr.department_id = d.id 
-        LEFT JOIN users u ON cr.user_id = u.id
-        ORDER BY cr.created_at DESC
+        ORDER BY cr.id DESC
     ");
     $cash_requests = $stmt->fetchAll();
 } elseif ($role == 'admin' || $role == 'root') {
-    // Fetch all requests
-    $stmt = $pdo->prepare("
+    // Fetch all inventory requests
+    $stmt = $pdo->query("
         SELECT r.*, u.username, ic.quantity_change 
         FROM requests r 
         JOIN users u ON r.user_id = u.id 
         LEFT JOIN inventory_changes ic ON r.id = ic.request_id
+        ORDER BY r.id DESC
     ");
-    $stmt->execute();
     $requests = $stmt->fetchAll();
-    
+
     // Fetch all budgets
-    $stmt = $pdo->query("SELECT * FROM budgets");
+    $stmt = $pdo->query("SELECT * FROM budgets ORDER BY id DESC");
     $budgets = $stmt->fetchAll();
+
+    // Fetch all cash requests
+    $stmt = $pdo->query("
+        SELECT cr.*, u.username, b.item AS budget_item, b.cost AS budget_cost 
+        FROM cash_requests cr 
+        JOIN users u ON cr.user_id = u.id 
+        JOIN budgets b ON cr.budget_id = b.id 
+        ORDER BY cr.id DESC
+    ");
+    $cash_requests = $stmt->fetchAll();
 }
 
 // Function to handle pagination
@@ -141,7 +178,7 @@ $totalPagesCashRequests = $paginatedCashRequests['totalPages'];
 </head>
 <body>
     <div class="container mt-5">
-        <h1 class="mb-4">Welcome, <?php echo ucfirst($role); ?></h1>
+        <h4 class="mb-4">Welcome, <?php echo ucfirst($_SESSION['username']); ?></h4>
         <a href="logout.php" class="btn btn-danger mb-3">Logout</a>
 
         <?php if ($role == 'admin' || $role == 'root'): ?>
@@ -156,7 +193,7 @@ $totalPagesCashRequests = $paginatedCashRequests['totalPages'];
         <?php endif; ?>
 
         <?php if ($role == 'user'): ?>
-            <h2>Your Requests</h2>
+            <h2>Your Inventory Requests</h2>
             <table class="table table-bordered table-hover">
                 <thead class="thead-light">
                     <tr>
@@ -200,8 +237,47 @@ $totalPagesCashRequests = $paginatedCashRequests['totalPages'];
                     </ul>
                 </nav>
             <?php endif; ?>
+
+            <h2>Your Cash Requests</h2>
+            <table class="table table-bordered table-hover">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Reason for Funds</th>
+                        <th>Requested Amount</th>
+                        <th>Budgeted Amount</th>
+                        <th>Status</th>
+                        <th>Date Submitted</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($cash_requests as $cash_request): ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($cash_request['budget_item']); ?></td>
+                            <td>UGX <?php echo number_format($cash_request['amount'], 2); ?></td>
+                            <td>UGX <?php echo number_format($cash_request['budget_cost'], 2); ?></td>
+                            <td>
+                                <span class="badge badge-<?php echo $cash_request['status'] == 'approved' ? 'success' : ($cash_request['status'] == 'rejected' ? 'danger' : 'secondary'); ?>">
+                                    <?php echo ucfirst($cash_request['status']); ?>
+                                </span>
+                            </td>
+                            <td><?php echo htmlspecialchars($cash_request['created_at']); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+            <!-- Pagination for Cash Requests -->
+            <?php if ($totalPagesCashRequests > 1): ?>
+                <nav aria-label="Page navigation">
+                    <ul class="pagination">
+                        <?php for ($i = 1; $i <= $totalPagesCashRequests; $i++): ?>
+                            <li class="page-item <?php if ($i == $pageCashRequests) echo 'active'; ?>"><a class="page-link" href="?pageCashRequests=<?php echo $i; ?>"><?php echo $i; ?></a></li>
+                        <?php endfor; ?>
+                    </ul>
+                </nav>
+            <?php endif; ?>
+
         <?php elseif ($role == 'headofdepartment'): ?>
-            <h2>Department Requests</h2>
+            <h2>Department Inventory Requests</h2>
             <table class="table table-bordered table-hover">
                 <thead class="thead-light">
                     <tr>
@@ -234,14 +310,14 @@ $totalPagesCashRequests = $paginatedCashRequests['totalPages'];
                             <td><?php echo htmlspecialchars($request['username']); ?></td>
                             <td><?php echo htmlspecialchars($request['created_at']); ?></td>
                             <td>
-                                <a href="approve_request.php?id=<?php echo $request['id']; ?>" class="btn btn-success <?php echo ($request['status'] != 'pending') ? 'disabled' : ''; ?>">Approve</a>
-                                <a href="reject_request.php?id=<?php echo $request['id']; ?>" class="btn btn-danger <?php echo ($request['status'] != 'pending') ? 'disabled' : ''; ?>">Reject</a>
+                                <a href="approve_cash_request.php?id=<?php echo $request['id']; ?>" class="btn btn-success <?php echo ($request['status'] != 'pending') ? 'disabled' : ''; ?>">Approve</a>
+                                <a href="reject_cash_request.php?id=<?php echo $request['id']; ?>" class="btn btn-danger <?php echo ($request['status'] != 'pending') ? 'disabled' : ''; ?>">Reject</a>
                             </td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
-            <!-- Pagination -->
+            <!-- Pagination for Requests -->
             <?php if ($totalPagesRequests > 1): ?>
                 <nav aria-label="Page navigation">
                     <ul class="pagination">
@@ -251,7 +327,8 @@ $totalPagesCashRequests = $paginatedCashRequests['totalPages'];
                     </ul>
                 </nav>
             <?php endif; ?>
-            <h2>Budgets</h2>
+
+            <h2>Department Budgets</h2>
             <table class="table table-bordered table-hover">
                 <thead class="thead-light">
                     <tr>
@@ -280,12 +357,57 @@ $totalPagesCashRequests = $paginatedCashRequests['totalPages'];
                     <?php endforeach; ?>
                 </tbody>
             </table>
-            <!-- Pagination -->
+            <!-- Pagination for Budgets -->
             <?php if ($totalPagesBudgets > 1): ?>
                 <nav aria-label="Page navigation">
                     <ul class="pagination">
                         <?php for ($i = 1; $i <= $totalPagesBudgets; $i++): ?>
                             <li class="page-item <?php if ($i == $pageBudgets) echo 'active'; ?>"><a class="page-link" href="?pageBudgets=<?php echo $i; ?>"><?php echo $i; ?></a></li>
+                        <?php endfor; ?>
+                    </ul>
+                </nav>
+            <?php endif; ?>
+
+            <h2>Department Cash Requests</h2>
+            <table class="table table-bordered table-hover">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Reason for Funds</th>
+                        <th>Requested Amount</th>
+                        <th>Budgeted Amount</th>
+                        <th>Submitted By</th>
+                        <th>Date Submitted</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($cash_requests as $cash_request): ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($cash_request['budget_item']); ?></td>
+                            <td>UGX <?php echo number_format($cash_request['amount'], 2); ?></td>
+                            <td>UGX <?php echo number_format($cash_request['budget_cost'], 2); ?></td>
+                            <td><?php echo htmlspecialchars($cash_request['username']); ?></td>
+                            <td><?php echo htmlspecialchars($cash_request['created_at']); ?></td>
+                            <td>
+                                <?php if ($cash_request['status'] == 'pending'): ?>
+                                    <a href="approve_cash_request.php?id=<?php echo $cash_request['id']; ?>" class="btn btn-success">Approve</a>
+                                    <a href="reject_cash_request.php?id=<?php echo $cash_request['id']; ?>" class="btn btn-danger">Reject</a>
+                                <?php else: ?>
+                                    <span class="badge badge-<?php echo $cash_request['status'] == 'approved_by_hod' ? 'success' :'danger'; ?>">
+                                        <?php echo ucfirst(str_replace('_', ' ', $cash_request['status'])); ?>
+                                    </span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+            <!-- Pagination for Cash Requests -->
+            <?php if ($totalPagesCashRequests > 1): ?>
+                <nav aria-label="Page navigation">
+                    <ul class="pagination">
+                        <?php for ($i = 1; $i <= $totalPagesCashRequests; $i++): ?>
+                            <li class="page-item <?php if ($i == $pageCashRequests) echo 'active'; ?>"><a class="page-link" href="?pageCashRequests=<?php echo $i; ?>"><?php echo $i; ?></a></li>
                         <?php endfor; ?>
                     </ul>
                 </nav>
@@ -346,27 +468,29 @@ $totalPagesCashRequests = $paginatedCashRequests['totalPages'];
                 <thead class="thead-light">
                     <tr>
                         <th>Reason for Funds</th>
+                        <th>Requested Amount</th>
+                        <th>Budgeted Amount</th>
                         <th>Department</th>
-                        <th>Amount</th>
-                        <th>Description</th>
                         <th>Submitted By</th>
+                        <th>Date Submitted</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($cash_requests as $cash_request): ?>
                         <tr>
-                            <td><?php echo htmlspecialchars($cash_request['item']); ?></td>
-                            <td><?php echo htmlspecialchars($cash_request['department_name']); ?></td>
+                            <td><?php echo htmlspecialchars($cash_request['budget_item']); ?></td>
                             <td>UGX <?php echo number_format($cash_request['amount'], 2); ?></td>
-                            <td><?php echo htmlspecialchars($cash_request['description']); ?></td>
+                            <td>UGX <?php echo number_format($cash_request['budget_cost'], 2); ?></td>
+                            <td><?php echo htmlspecialchars($cash_request['department_name']); ?></td>
                             <td><?php echo htmlspecialchars($cash_request['submitted_by_name']); ?></td>
+                            <td><?php echo htmlspecialchars($cash_request['created_at']); ?></td>
                             <td>
-                                <?php if ($cash_request['status'] == 'pending'): ?>
-                                    <a href="approve_cash_request.php?id=<?php echo $cash_request['id']; ?>" class="btn btn-success">Approve</a>
-                                    <a href="reject_cash_request.php?id=<?php echo $cash_request['id']; ?>" class="btn btn-danger">Reject</a>
+                                <?php if ($cash_request['status'] == 'approved_by_hod'): ?>
+                                    <a href="approve_cash_request_finance.php?id=<?php echo $cash_request['id']; ?>" class="btn btn-success">Disburse</a>
+                                    <a href="reject_cash_request_finance.php?id=<?php echo $cash_request['id']; ?>" class="btn btn-danger">Reject</a>
                                 <?php else: ?>
-                                    <span class="badge badge-<?php echo $cash_request['status'] == 'approved' ? 'success' :'danger'; ?>">
+                                    <span class="badge badge-<?php echo $cash_request['status'] == 'disbursed' ? 'success' :'danger'; ?>">
                                         <?php echo ucfirst($cash_request['status']); ?>
                                     </span>
                                 <?php endif; ?>
@@ -385,6 +509,7 @@ $totalPagesCashRequests = $paginatedCashRequests['totalPages'];
                     </ul>
                 </nav>
             <?php endif; ?>
+
         <?php endif; ?>
     </div>
     <!-- Optional JavaScript -->
