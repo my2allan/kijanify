@@ -129,11 +129,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     output += '</ul>';
                     document.getElementById('availableFunds').innerHTML = output;
 
-                    // Populate item dropdown
+                    // Populate item dropdown for Reason for Funds
                     let itemDropdown = document.getElementById('item');
-                    itemDropdown.innerHTML = '<option value="">Select Item</option>';
+                    itemDropdown.innerHTML = '<option value="">Select Reason for Funds</option>';
                     budgets.forEach(function(budget) {
-                        itemDropdown.innerHTML += `<option value="${budget.item}">${budget.item}</option>`;
+                        itemDropdown.innerHTML += `<option value="${budget.item}" data-cost="${budget.cost}">${budget.item}</option>`;
                     });
                 }
             }
@@ -148,7 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             if (requestType === 'cash') {
                 itemLabel.textContent = 'Reason for Funds:';
                 quantityLabel.textContent = 'Amount:';
-                itemField.outerHTML = '<input type="text" class="form-control" name="item" id="item" required>';
+                itemField.outerHTML = '<select class="form-control" name="item" id="item" required><option value="">Select Reason for Funds</option></select>';
                 const departmentId = document.getElementById('department_id').value;
                 if (departmentId) {
                     fetchApprovedBudgets(departmentId);
