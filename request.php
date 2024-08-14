@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     if ($request_type == 'cash') {
         // Fetch available funds from the budgets table
-        $stmt = $pdo->prepare("SELECT SUM(amount) AS available_funds FROM budgets WHERE department_id = ? AND status = 'approved'");
+        $stmt = $pdo->prepare("SELECT SUM(cost) AS available_funds FROM budgets WHERE department_id = ? AND status = 'approved'");
         $stmt->execute([$department_id]);
         $available_funds = $stmt->fetchColumn();
 
@@ -98,9 +98,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             xhr.onload = function() {
                 if (this.status == 200) {
                     const inventory = JSON.parse(this.responseText);
-                    let output = '<ul class="list-group">';
+                    let output = '<h4>Inventory Items</h4><ul class="list-group">';
                     inventory.forEach(function(item) {
-                        output += `<li class="list-group-item">${item.item_name}: ${item.quantity}</li>`;
+                        output += `<li class="list-group-item"><span class="badge badge-primary">Inventory</span> ${item.item_name}: ${item.quantity}</li>`;
                     });
                     output += '</ul>';
                     document.getElementById('inventory').innerHTML = output;
@@ -116,6 +116,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             xhr.send();
         }
 
+        function fetchApprovedBudgets(departmentId) {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', 'get_approved_budgets.php?department_id=' + departmentId, true);
+            xhr.onload = function() {
+                if (this.status == 200) {
+                    const budgets = JSON.parse(this.responseText);
+                    let output = '<h4>Approved Budgets</h4><ul class="list-group">';
+                    budgets.forEach(function(budget) {
+                        output += `<li class="list-group-item"><span class="badge badge-success">Budget</span> ${budget.item}: UGX ${budget.cost}</li>`;
+                    });
+                    output += '</ul>';
+                    document.getElementById('availableFunds').innerHTML = output;
+
+                    // Populate item dropdown
+                    let itemDropdown = document.getElementById('item');
+                    itemDropdown.innerHTML = '<option value="">Select Item</option>';
+                    budgets.forEach(function(budget) {
+                        itemDropdown.innerHTML += `<option value="${budget.item}">${budget.item}</option>`;
+                    });
+                }
+            }
+            xhr.send();
+        }
+
         function toggleLabels() {
             const requestType = document.getElementById('request_type').value;
             const itemLabel = document.getElementById('item_label');
@@ -125,7 +149,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 itemLabel.textContent = 'Reason for Funds:';
                 quantityLabel.textContent = 'Amount:';
                 itemField.outerHTML = '<input type="text" class="form-control" name="item" id="item" required>';
-                fetchAvailableFunds(); // Fetch available funds for cash requests
+                const departmentId = document.getElementById('department_id').value;
+                if (departmentId) {
+                    fetchApprovedBudgets(departmentId);
+                }
             } else if (requestType === 'inventory') {
                 itemLabel.textContent = 'Item:';
                 quantityLabel.textContent = 'Quantity/Amount:';
@@ -141,26 +168,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         }
 
-        function fetchAvailableFunds() {
-            const departmentId = document.getElementById('department_id').value;
-            if (departmentId) {
-                const xhr = new XMLHttpRequest();
-                xhr.open('GET', 'get_available_funds.php?department_id=' + departmentId, true);
-                xhr.onload = function() {
-                    if (this.status == 200) {
-                        const availableFunds = JSON.parse(this.responseText);
-                        document.getElementById('availableFunds').textContent = 'Available Funds: UGX ' + availableFunds;
-                    }
-                }
-                xhr.send();
-            }
-        }
-
         document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('department_id').addEventListener('change', function() {
                 const departmentId = this.value;
                 fetchInventory(departmentId);
-                fetchAvailableFunds(); // Fetch available funds when department changes
+                fetchApprovedBudgets(departmentId); // Fetch approved budgets when department changes
             });
             document.getElementById('request_type').addEventListener('change', toggleLabels);
             toggleLabels(); // Initialize labels on page load
